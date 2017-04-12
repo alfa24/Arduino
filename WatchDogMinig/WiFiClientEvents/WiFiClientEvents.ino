@@ -7,41 +7,38 @@
  */
 
 #include <ESP8266WiFi.h>
+#include <ArduinoOTA.h>
+class Device {
+  public:
+  char* ip;
+  int pin;
+  int err = 0;
+  int timeReset = 0;  
+};
 
-const char* ssid     = "Keenetic-6004";
-const char* password = "60600000";
-boolean isWiFiConnected;
 
-//Время для перезагрузки компа (сек)
-const int timeRebot = 600;
+//const char* ssid     = "Keenetic-6004";
+//const char* password = "60600000";
+const char* ssid     = "alfa24";
+const char* password = "Free38ride";
+const int countDev = 1;  //количество устройств
+const int timeRebot = 600;  ////Время для перезагрузки компа (сек)
+boolean isWiFiConnected; //флаг подключения к сети
 
+Device devices[countDev];
+
+//настройки для роутера
 char* internet = "ya.ru";
 char* router = "192.168.1.1";
 int pin0 = 16;
 int timeReset0 = 120;
 int wifiLed = 14; //wi-fi connected
 
-char* rig1 = "192.168.1.11";
-int pin1 = 5;
-int timeReset1 = 0;
-
-char* rig2 = "192.168.1.12";
-int pin2 = 4;
-int timeReset2 = 0;
-
-char* rig3 = "192.168.1.13";
-int pin3 = 0;
-int timeReset3 = 0;
-
-char* rig4 = "192.168.1.14";
-int pin4 = 2;
-int timeReset4 = 0;
-
 void WiFiEvent(WiFiEvent_t event) {
     switch(event) {
         case WIFI_EVENT_STAMODE_GOT_IP:
             Serial.println();
-            Serial.println("WiFi connected");
+            Serial.println("WiFi connected!!!");
             Serial.println("IP address: ");
             Serial.println(WiFi.localIP());
             digitalWrite(wifiLed, HIGH);
@@ -55,13 +52,18 @@ void WiFiEvent(WiFiEvent_t event) {
 }
 
 void setup() {
+    initDevices();
+    
+    ArduinoOTA.setHostname("WatchDOG01");
+    ArduinoOTA.begin();
+    
     Serial.begin(115200);
     pinMode(wifiLed, OUTPUT);
     pinMode(pin0, OUTPUT);
-    pinMode(pin1, OUTPUT);
-    pinMode(pin2, OUTPUT);
-    pinMode(pin3, OUTPUT);
-    pinMode(pin4, OUTPUT);
+    pinMode(5, OUTPUT);
+    pinMode(4, OUTPUT);
+    pinMode(0, OUTPUT);
+    pinMode(2, OUTPUT);
     
     // delete old config
     WiFi.disconnect(true);
@@ -71,18 +73,29 @@ void setup() {
     WiFi.onEvent(WiFiEvent);
     WiFi.begin(ssid, password);
     Serial.println("Wait for WiFi... ");
-    
 }
 
+void initDevices(){
+    devices[0].ip = "192.168.1.11";
+    devices[0].pin = 5;
+    devices[0].ip = "192.168.1.12";
+    devices[0].pin = 4;
+    devices[0].ip = "192.168.1.13";
+    devices[0].pin = 0;
+    devices[0].ip = "192.168.1.14";
+    devices[0].pin = 2;    
+}
 
 void loop() {
+    ArduinoOTA.handle();
     checkRouter(); 
     
-    delay(5000); 
-    checkRig1();        
-    checkRig2();        
-    checkRig3();        
-    checkRig4();       
+    delay(60000); 
+    int i;
+    for (i = 0; i < countDev; i = i + 1) {
+       checkDev(devices[i]);
+    }
+
 }
 
 void checkRouter() {
@@ -109,47 +122,20 @@ void checkRouter() {
   } 
 }
 
-void checkRig1() {
+void checkDev(Device dev) {
   if (isWiFiConnected) {
-      if (!pingHost(rig1)) {
-        if (resetHost(pin1, timeReset1)) {
-            Serial.println("Reset Rig1.....");
-            timeReset1 = millis()/1000;  
-        }        
-      } 
-  }
-}
-
-void checkRig2() {
-  if (isWiFiConnected) {
-      if (!pingHost(rig2)) {
-        if (resetHost(pin2, timeReset2)) {
-            Serial.println("Reset Rig2.....");      
-            timeReset2 = millis()/1000;  
-        }        
-      } 
-  }
-}
-
-void checkRig3() {
-  if (isWiFiConnected) {
-      if (!pingHost(rig3)) {
-        if (resetHost(pin3, timeReset3)) {
-            Serial.println("Reset Rig3.....");      
-            timeReset3 = millis()/1000;  
-        }        
-      } 
-  }
-}
-
-void checkRig4() {
-  if (isWiFiConnected) {
-      if (!pingHost(rig4)) {
-        if (resetHost(pin4, timeReset4)) {
-            Serial.println("Reset Rig4.....");      
-            timeReset4 = millis()/1000;  
-        }        
-      } 
+      if (!pingHost(dev.ip)) {
+        dev.err++;
+        if (dev.err >= 5) {
+          if (resetHost(dev.pin, dev.timeReset)) {
+            Serial.println("Reset dev.....");
+            dev.timeReset = millis()/1000;  
+          }
+        }
+                
+      } else {
+        dev.err = 0;
+      }
   }
 }
 
@@ -213,4 +199,8 @@ boolean pingICMP(char* remote_host) {
   }
   return false;   
 }
+
+
+
+
 
